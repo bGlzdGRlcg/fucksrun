@@ -1,0 +1,810 @@
+<!doctype html>
+<!--
+Ported from example/app/src/main/assets/route-editor.html.
+MIT License
+
+Copyright (c) 2026 Inverx
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>线路预览与规划</title>
+  <!-- CONFIG -->
+  <script>document.documentElement.dataset.theme=(window.ROUTE_CONFIG?.darkTheme??matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';</script>
+  <style>
+    :root{color-scheme:light;--surface:#f7f7f7;--card:#fff;--text:#191919;--muted:#757575;--control:#f1f2f5;--accent:#3482ff;--accent-soft:#edf4ff;--line:#eceef2;--shadow:0 6px 28px #182d4a12}
+    :root[data-theme=dark]{color-scheme:dark;--surface:#0e1116;--card:#202329;--text:#f2f4f8;--muted:#a4aab5;--control:#30343b;--accent:#6ea4ff;--accent-soft:#293950;--line:#383d46;--shadow:0 6px 28px #0003}
+    *{box-sizing:border-box}html,body,#map{width:100%;height:100%;margin:0;font-family:system-ui,"Microsoft YaHei",sans-serif;color:var(--text)}
+    body{background:var(--surface)}#map{position:fixed;inset:0;width:auto;height:auto;touch-action:none}[hidden]{display:none!important}
+    button,input{font:inherit;touch-action:manipulation}button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:10px 12px;border:0;border-radius:14px;background:var(--control);color:var(--text);font-size:13px;font-weight:550;cursor:pointer;transition:background .16s,transform .16s}
+    button:disabled{opacity:.38;cursor:default}button:active:not(:disabled){transform:scale(.97)}button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    button.primary{background:var(--accent);color:white}button.selected{color:var(--accent);background:var(--accent-soft)}
+    .tool-icon{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .panel{position:fixed;z-index:100;left:16px;right:16px;background:var(--card);border-radius:24px;box-shadow:var(--shadow)}
+    body.native-ui .panel{display:none!important}body.native-ui #fit{display:none!important}
+    body.native-ui .amap-logo,body.native-ui .amap-copyright{bottom:calc(var(--native-bottom,0px) + 8px)!important}
+    body.native-ui .amap-scalecontrol{bottom:calc(var(--native-bottom,0px) + 40px)!important}
+    .top{top:12px;padding:16px 18px;max-height:25%;overflow:auto;overscroll-behavior:contain}
+    .top{display:none!important}
+    #editorHeading,#toolsHeading{display:none!important}
+    .heading{display:flex;align-items:center;gap:12px}.campus-icon{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:14px;background:var(--accent-soft);color:var(--accent);flex:none}.campus-icon .tool-icon{width:23px;height:23px}
+    .campus-title{flex:1;min-width:0}.eyebrow{font-size:10px;letter-spacing:1px;color:var(--muted);margin-bottom:3px}#school{font-size:15px;font-weight:650;line-height:1.35;overflow-wrap:anywhere}
+    #detailsToggle{background:transparent;min-height:40px;padding:8px 4px;font-size:12px;color:var(--muted);flex:none}
+    #checkInRequirements{font-size:12px;color:var(--muted);line-height:1.5;margin-top:10px}#viaCheckIns{width:100%;margin-top:10px;background:var(--accent-soft);color:var(--accent)}
+    #details .hint{margin-top:8px}#legend{padding-top:8px;border-top:1px solid var(--line)}
+.map-actions{position:fixed;z-index:100;right:18px;top:154px;display:flex;flex-direction:column;gap:8px}.map-actions button{min-width:48px}
+    .bottom{bottom:12px;max-height:52%;padding:9px 18px 16px;display:flex;flex-direction:column;overflow:hidden}
+    .sheet-content{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}.sheet-grip,.footer-row{flex-shrink:0}
+    .sheet-grip{width:30px;height:4px;margin:0 auto 12px;border-radius:8px;background:var(--line)}
+    .editor-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.editor-title{font-size:17px;font-weight:650}
+    .editing-switch{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);min-height:30px}.editing-switch input{width:16px;height:16px;margin:0;accent-color:var(--accent)}
+    .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mode-row{padding:4px;background:var(--control);border-radius:18px;gap:4px;flex-wrap:nowrap}
+    .mode{flex:1;flex-direction:column;gap:5px;min-height:60px;padding:8px 3px;background:transparent;border-radius:14px;font-size:11px;white-space:nowrap;font-weight:500;color:var(--muted)}.mode .tool-icon{width:21px;height:21px}
+    .mode.selected{background:var(--card);color:var(--accent);box-shadow:0 2px 8px #172b4310;font-weight:650}
+    .route-state{display:flex;align-items:flex-start;gap:8px;margin:12px 0 8px}.route-dot{width:7px;height:7px;margin-top:6px;flex:none;border-radius:50%;background:var(--accent)}#summary{font-size:13px;line-height:1.45;font-weight:600}
+    #status{font-size:11px;line-height:1.5;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}#status.error{color:#df5a53}
+    .edit-row{gap:4px;padding:7px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.edit-row button{flex:1;min-width:0;min-height:40px;padding:8px 6px;background:transparent;font-size:11px}.edit-row .tool-icon{width:16px;height:16px}.edit-row button.selected{background:var(--accent-soft)}
+    label{display:flex;align-items:center;gap:6px;font-size:12px;min-height:40px}input[type=checkbox],input[type=range]{accent-color:var(--accent)}.edit-row label{padding:0 5px;color:var(--muted)}
+    .tools-heading{display:flex;align-items:center;gap:10px;margin-top:8px}#note{font-size:11px;line-height:1.5;color:var(--muted);flex:1;margin:0}
+    .advanced{padding:12px;margin-top:10px;background:var(--control);border-radius:16px}.advanced-title{font-size:11px;color:var(--muted);margin-bottom:5px}.advanced .row+.row{margin-top:8px}.advanced button{background:var(--card);min-height:40px;font-size:11px;padding:8px 10px}.advanced button.selected{background:var(--accent-soft)}
+    #routeOptions,#startTools{gap:6px}#jitter{width:90px}#jitterValue{white-space:nowrap;font-size:11px}#startTools label{flex:1;justify-content:space-between;min-width:180px}
+    .footer-row{margin-top:8px;padding:8px 0 0;flex-wrap:nowrap;background:var(--card)}#save{flex:1;min-height:48px;font-size:14px;font-weight:600;border-radius:16px}#retry{display:none}
+    .hint{font-size:11px;line-height:1.55;color:var(--muted)}#liveStats{font-size:17px;font-weight:650;line-height:1.6}
+    #drawSurface{position:fixed;inset:0;z-index:80;pointer-events:none}
+    #map.drawing{cursor:crosshair}
+    .number{background:#3482ff;color:white;border:2px solid white;border-radius:50%;width:27px;height:27px;text-align:center;line-height:23px;font-weight:600;box-shadow:0 1px 6px #0003}.number.start{background:#157a69}.number.linked{transform:translate(24px,16px)}.number.end{background:#22a35a}
+.liveHead{width:16px;height:16px;border-radius:50%;background:#3482ff;border:3px solid white;box-shadow:0 0 0 5px #3482ff25}.locationHead{width:18px;height:18px;border-radius:50%;background:#3482ff;border:3px solid white;box-shadow:0 0 0 6px #3482ff35}
+    body.picking-start .mode-row,body.picking-start .edit-row,body.picking-start .advanced{display:none!important}
+    @media(max-width:360px){.panel{left:10px;right:10px}.top{padding:12px 14px}.bottom{padding:8px 12px 12px}.mode{min-height:54px;font-size:10px}.edit-row{gap:2px}.edit-row button{padding:7px 3px;font-size:10px}.edit-row .tool-icon{width:14px;height:14px}.map-actions{right:12px}}
+    @media(max-height:650px){.top{top:8px}.bottom{bottom:8px;max-height:46%}.sheet-grip{margin-bottom:8px}.editor-heading{margin-bottom:8px}.mode{min-height:50px;gap:3px}.route-state{margin:8px 0}.tools-heading{margin-top:5px}.footer-row{margin-top:8px}#note{display:none}}
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="drawSurface" hidden aria-label="手绘轨迹区域"></div>
+  <div class="panel top">
+    <div class="heading">
+      <div class="campus-icon" aria-hidden="true"><svg class="tool-icon" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+      <div class="campus-title"><div class="eyebrow">校园线路</div><div id="school">地图浏览</div></div>
+      <button id="detailsToggle" aria-expanded="false" aria-controls="details">说明</button>
+    </div>
+    <div id="checkInRequirements">跑道模式：两弯道端点 + 一侧直道三点定形</div>
+    <div id="details" hidden><div class="hint" id="checkInNote">登录并加载校园围栏后查看打卡要求</div><div class="hint" id="previewNote"></div><div class="hint" id="legend">蓝色实线为路线，浅蓝虚线为预览；紫色虚线为接入段，绿色为校园围栏。红色「打」为打卡点，紫色「碰」为碰一碰参考点。</div></div>
+  </div>
+  <div class="map-actions"><button id="location" aria-label="定位当前位置">定位</button><button id="satellite" aria-label="切换卫星图">卫星</button></div>
+  <div class="panel bottom">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="sheet-content">
+    <div class="editor-heading" id="editorHeading"><div class="editor-title">规划路线</div><input id="editing" type="checkbox" checked hidden><span id="editingLabel" hidden></span></div>
+    <div id="liveStats" hidden></div>
+    <div class="row mode-row" id="modesRow" hidden><button id="track" class="mode selected">跑道模式</button><button id="manual" class="mode">手动加点</button><button id="road" class="mode">吸附道路</button><button id="draw" class="mode">手绘轨迹</button></div>
+    <button id="viaCheckIns" hidden>经本次打卡点规划步行线路</button>
+    <div class="route-state"><span class="route-dot" aria-hidden="true"></span><div><div id="summary">0 个控制点 · 0 米</div><div id="status" role="status" aria-live="polite">正在加载高德地图…</div></div></div>
+    <div class="row edit-row" id="editRow"><button id="undo">撤销</button><button id="clear">清空</button><button id="insert">插点</button><button id="simplify" hidden>精简</button><button id="fromPreview" hidden>取预览</button><label><input id="closed" type="checkbox">闭合</label></div>
+    <div class="tools-heading" id="toolsHeading"><div id="note">跑道模式：依次选择两个弯道尖端和一侧直道点，拖动三个点对齐跑道。</div></div>
+    <div class="advanced" id="advancedTools" hidden>
+      <div class="advanced-title">线路复用与起跑设置</div>
+      <div class="row" id="routeOptions"><label><input id="fixed" type="checkbox">固定复用</label><button id="saveFixed">保存固定线路</button><button id="loadFixed" hidden>载入固定线路</button><button id="reverseTrack" hidden>反向绕行</button></div>
+      <div class="row" id="startTools"><button id="pickStart">设置起跑点</button><button id="resetStart" hidden>用线路起点</button></div>
+      <input id="jitter" type="range" min="0" max="16" step="0.5" value="0" hidden><span id="jitterValue" hidden>0 米</span>
+    </div>
+    </div>
+    <div class="row footer-row"><button id="cancelStart" hidden>取消选点</button><button id="retry">重新加载</button><button id="save" class="primary" disabled>使用线路</button></div>
+  </div>
+  <script>
+  (function(){
+    'use strict';
+    const config=window.ROUTE_CONFIG||{}, $=id=>document.getElementById(id);
+    document.body.classList.toggle('native-ui',config.nativeControls===true);
+    let uiTimer=null,nativeInsets=[24,24,24,24];
+    const nativeActions=['track','manual','road','draw','undo','clear','insert','simplify','closed','editing','fixed','saveFixed','loadFixed','reverseTrack','pickStart','resetStart','fromPreview','viaCheckIns','save','retry','cancelStart'];
+    function uiState(){return {ready,pending,valid,mode,closed,fixed,startPicking,reverse:trackReverse,jitterMeters,
+      school:$('school').textContent,requirements:$('checkInRequirements').textContent,summary:$('summary').textContent,
+      status:$('status').textContent,error:!!lastError,note:$('note').textContent,
+      details:[$('checkInNote').textContent,$('previewNote').textContent,$('legend').textContent].filter(Boolean).join('\n\n'),
+      liveStats:$('liveStats').textContent,saveLabel:$('save').textContent,
+      controls:Object.fromEntries(nativeActions.map(id=>{const el=$(id);return [id,{enabled:!el.disabled&&(id==='retry'||ready)&&(!viewer||['fit','retry'].includes(id)),
+        visible:!el.hidden&&(id!=='retry'||el.style.display==='block'),checked:el.checked===true}];}))};}
+    function publishUi(){if(!config.nativeControls||uiTimer!==null)return;
+      uiTimer=setTimeout(()=>{uiTimer=null;if(window.RouteNative&&typeof RouteNative.updateUiState==='function')RouteNative.updateUiState(JSON.stringify(uiState()));},16);}
+    // Local SVGs add recognizable actions without network fonts or icon-only controls.
+    const toolIcons={
+      track:'<rect x="4" y="3" width="16" height="18" rx="8"/><rect x="8" y="7" width="8" height="10" rx="4"/>',
+      manual:'<path d="M12 4v16M4 12h16"/>',road:'<path d="m6 3-3 18m15-18 3 18M12 3v4m0 3v4m0 3v4"/>',
+      draw:'<path d="m15 4 5 5-11 11H4v-5L15 4Zm-2 2 5 5"/>',
+      undo:'<path d="m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12"/>',clear:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
+      insert:'<path d="M4 4v16m16-16v16M8 12h8m-4-4v8"/>',simplify:'<path d="m3 18 5-12 8 10 5-13M3 18 21 3"/>',
+      fit:'<path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/>',
+      saveFixed:'<path d="M4 3h13l3 3v15H4V3Zm3 0v6h10V3M8 21v-7h8v7"/>',
+      loadFixed:'<path d="M3 6h7l2 2h9l-2 12H3V6Z"/>',reverseTrack:'<path d="M4 7h16l-4-4M20 17H4l4 4"/>',
+      pickStart:'<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
+      resetStart:'<path d="M4 10a8 8 0 1 1 2 8M4 4v6h6"/>',retry:'<path d="M20 7a8 8 0 0 0-14-2L3 8m0-5v5h5m-4 9a8 8 0 0 0 14 2l3-3m0 5v-5h-5"/>',
+      viaCheckIns:'<path d="M5 3v14a4 4 0 0 0 8 0V7a3 3 0 0 1 6 0v14"/><circle cx="5" cy="3" r="2"/>',
+      fromPreview:'<path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/>',save:'<path d="m5 12 4 4L19 6"/>',
+    };
+    function setToolText(id,text){const button=$(id);button.textContent=text;if(toolIcons[id])button.insertAdjacentHTML('afterbegin','<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">'+toolIcons[id]+'</svg>');}
+    Object.keys(toolIcons).forEach(id=>{if($(id))setToolText(id,$(id).textContent);});
+    const lockedMode=['track','draw'].includes(config.lockedMode)?config.lockedMode:null;
+    let map=null,walking=null,line=null,previewLine=null,fence=null,markers=[],checkInMarkers=[],accessLines=[],access=[],anchors=[],path=[],mode='track',closed=true;
+    let revision=0,timer=null,pending=false,valid=false,ready=false,lastError=null;
+    let currentLocation=null,pendingLocation=null,locationMarker=null,locationCircle=null,satelliteLayer=null,roadNetLayer=null,standardLayers=[];
+    const normalLocation=config.currentLocation;
+    function validLocation(value){return value&&Number.isFinite(Number(value.latitude))&&Number(value.latitude)>=-90&&Number(value.latitude)<=90&&Number.isFinite(Number(value.longitude))&&Number(value.longitude)>=-180&&Number(value.longitude)<=180&&Number.isFinite(Number(value.accuracy))&&Number(value.accuracy)>=0;}
+    function convertGps(value){return new Promise((resolve,reject)=>{if(!validLocation(value)){reject(Error('当前位置无效，请检查定位权限后重试'));return;}let settled=false;const finish=(error,result)=>{if(settled)return;settled=true;clearTimeout(timeout);if(error){reject(error);return;}const p=result.locations[0];resolve({point:[p.getLng(),p.getLat()],accuracy:Number(value.accuracy)});};const timeout=setTimeout(()=>finish(Error('当前位置坐标转换超时，请重试')),15000);try{AMap.convertFrom([Number(value.longitude),Number(value.latitude)],'gps',(status,result)=>{if(status!=='complete'||!result||!result.locations||!result.locations.length){finish(Error('当前位置坐标转换失败，请重试'));return;}finish(null,result);});}catch(error){finish(error);}});}
+    function updateLocationMarker(location,center=true){if(!map)return;const point=location.point;
+      if(locationMarker)locationMarker.setPosition(point);else locationMarker=new AMap.Marker({position:point,anchor:'center',bubble:false,zIndex:180,content:'<div class="locationHead"></div>',map});
+      if(locationCircle)locationCircle.setCenter(point),locationCircle.setRadius(location.accuracy);else locationCircle=new AMap.Circle({center:point,radius:location.accuracy,strokeColor:'#3482ff',strokeWeight:1,fillColor:'#3482ff',fillOpacity:.12,bubble:false,zIndex:70,map});
+      if(center)map.setZoomAndCenter(18.5,point,true);currentLocation=location;
+    }
+    async function applyLocation(value,center=true){pendingLocation=value;try{const location=await convertGps(value);if(pendingLocation!==value)return;pendingLocation=null;if(!map){pendingLocation=value;return;}updateLocationMarker(location,center);status('当前位置已定位');}catch(error){if(pendingLocation===value){pendingLocation=null;status(error.message||'当前位置坐标转换失败，请重试',true);$('retry').style.display='block';}}}
+    function configureBasemap(){
+      standardLayers=map.getLayers().slice();
+      satelliteLayer=new AMap.TileLayer.Satellite({zIndex:1});
+      roadNetLayer=new AMap.TileLayer.RoadNet({zIndex:2});
+      let satelliteEnabled=false;
+      $('satellite').textContent='标准';
+      $('satellite').classList.remove('selected');
+      $('satellite').onclick=()=>{
+        satelliteEnabled=!satelliteEnabled;
+        map.setLayers(satelliteEnabled?[satelliteLayer,roadNetLayer]:standardLayers);
+        if(!satelliteEnabled)map.setMapStyle('amap://styles/normal');
+        $('satellite').textContent=satelliteEnabled?'卫星':'标准';
+        $('satellite').classList.toggle('selected',satelliteEnabled);
+        // Route overlays are independent of the tile layers and remain legible on either basemap.
+        if(line)line.setMap(map);
+        renderLine();
+      };
+    }
+    $('checkInRequirements').textContent=config.checkInRequirements||'跑道模式：两弯道端点 + 一侧直道三点定形';
+    let drawn=[],stroke=null,history=[],tapGesture=null,controlTap=null,lastPointerUp=-Infinity,lastNavigation=-Infinity;
+    let fixed=false,fixedPath=[],selectedStart=null,startPicking=false,inserting=false,jitterMeters=0,startMarker=null;
+    let trackReverse=false;
+    const MAX_DRAWING_POINTS=256;
+    let drawingSimplification=null;
+    const pointers=new Map(),roadCache=new Map();
+    let multiTouch=false,navigation=null,navigationFrame=0,navigationEndTimer=0;
+    const boundary=config.boundary||[],preview=config.preview||[];
+    const activeRun=config.requireCheckIns===true,sessionStart=Array.isArray(config.sessionStart)?config.sessionStart:null;
+    const targets=config.targetPoints||[];
+    const checkInPolicy=config.checkInPolicy||{validDistance:12,clockMode:0};
+    const checkInRadius=Number(checkInPolicy.validDistance);
+    const DRAW_CLOSE_METERS=12;
+    const draft=config.draft||{mode:lockedMode||'track',closed:lockedMode==='track'};
+    let trackDefaultStart=!draft.startPoint;
+    mode=lockedMode||(['road','draw','track','manual'].includes(draft.mode)?draft.mode:'track');
+    anchors=(draft.anchors||[]).map(p=>p.slice());if(mode!=='track')anchors=pinStart(anchors);closed=mode==='track'||draft.closed===true;trackReverse=draft.reverse===true;
+    if(mode==='draw')loadDrawing(draft.path||[]);
+    fixed=draft.fixed===true;fixedPath=(draft.path||[]).map(p=>p.slice());selectedStart=activeRun?sessionStart:(draft.startPoint||null);
+    jitterMeters=draft.jitterMeters==null?0:Number(draft.jitterMeters);$('fixed').checked=fixed;$('jitter').value=jitterMeters;
+    if(fixed)$('editing').checked=false;
+    $('pickStart').hidden=activeRun;$('resetStart').hidden=activeRun||!selectedStart;
+    $('loadFixed').hidden=!config.fixedDraft;
+    $('closed').checked=closed;
+    $('fromPreview').hidden=preview.length<2||activeRun;
+    $('viaCheckIns').hidden=!activeRun;
+    $('school').textContent=config.fenceName||'线路规划';
+    $('checkInRequirements').textContent=config.checkInRequirements||'手动加点、手绘轨迹、操场绕圈或吸附步行道路';
+    $('checkInNote').textContent=config.checkInNote||'线路保存在本机，不需要登录或 Token。';
+    $('previewNote').textContent=config.previewNote||'';
+    // Read-only viewer: live run tracking or finished-run replay. Editing stays disabled.
+    const viewer=config.viewer==='live'||config.viewer==='finished'?config.viewer:null;
+    let liveTrack=(config.liveTrack||[]).filter(p=>Array.isArray(p)&&p.length>=2&&p.every(Number.isFinite));
+    let liveStartMs=Number(config.liveStartMs)||0;
+    let liveTargets=(config.liveTargetPoints||[]).map(p=>({code:String(p.code??''),clockTime:Number(p.clockTime)||0}));
+    let liveBase={seconds:Number(config.liveElapsed)||0,at:performance.now(),running:config.liveRunning===true,ending:false};
+    let liveLine=null,livePlanned=null,liveHead=null,liveEndMarkers=[];
+    function fmtDuration(s){s=Math.max(0,Math.floor(s));const h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=s%60;
+      return h?h+':'+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0'):String(m).padStart(2,'0')+':'+String(x).padStart(2,'0');}
+    function fmtPace(secPerKm){if(!Number.isFinite(secPerKm)||secPerKm<=0)return "--'--\"";
+      return Math.floor(secPerKm/60)+"'"+String(Math.round(secPerKm%60)).padStart(2,'0')+'"';}
+    function liveElapsed(){return liveBase.running?liveBase.seconds+(performance.now()-liveBase.at)/1000:liveBase.seconds;}
+    function renderLive(){if(!map||!viewer)return;
+      const elapsed=liveElapsed();
+      let idx=0;while(idx<liveTrack.length&&Number(liveTrack[idx][2])<=elapsed)idx++;
+      const shown=liveTrack.slice(0,Math.max(idx,liveTrack.length?1:0)).map(p=>[p[0],p[1]]);
+      let head=shown.length?shown[shown.length-1].slice():null;
+      let covered=0;for(let i=1;i<shown.length;i++)covered+=distance(shown[i-1],shown[i]);
+      if(idx>0&&idx<liveTrack.length){const a=liveTrack[idx-1],b=liveTrack[idx],span=Number(b[2])-Number(a[2]);
+        const t=span>0?Math.min(1,Math.max(0,(elapsed-Number(a[2]))/span)):0;
+        head=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];covered+=distance(shown[shown.length-1],head);}
+      if(liveLine){if(shown.length>=2)liveLine.setPath(shown);else liveLine.setMap(null);}
+      else if(shown.length>=2){liveLine=new AMap.Polyline({path:shown,strokeColor:'#22a35a',strokeWeight:6,lineJoin:'round',bubble:true,zIndex:80,map});}
+      if(liveHead){if(head)liveHead.setPosition(head);else liveHead.setMap(null);}
+      else if(head){liveHead=new AMap.Marker({position:head,anchor:'center',bubble:false,zIndex:120,content:'<div class="liveHead"></div>',map});}
+      let passedCount=0;
+      liveTargets.forEach((t,i)=>{const passed=t.clockTime>0&&liveStartMs>0&&(t.clockTime-liveStartMs)/1000<=elapsed;
+        if(passed)passedCount++;
+        const marker=checkInMarkers[i];if(!marker)return;
+        const content=marker.getContent();const badge=content&&content.querySelector?content.querySelector('.badge'):null;
+        if(badge)badge.parentElement.classList.toggle('pass',passed);});
+      if(viewer==='live'){
+        const target=Number(config.liveTargetDistance)||0,pace=Number(config.liveTargetPace)||0;
+        $('liveStats').textContent='已跑 '+Math.round(covered)+' 米 / 目标 '+target+' 米 · 用时 '+fmtDuration(elapsed)+' · 配速 '+fmtPace(covered>0?elapsed/covered*1000:0)
+          +(liveTargets.length?' · 打卡 '+passedCount+'/'+liveTargets.length:'');
+        $('status').textContent=!liveTrack.length?'正在生成轨迹…':liveBase.running?'正在记录，每 3 秒一个采样点':(liveBase.ending?'正在结束并保存…':'已暂停或已结束，轨迹定格在当前进度');
+      }else{
+        const stats=config.liveStats||{};
+        const meters=Number(stats.distance)||Math.round(covered),seconds=Number(stats.duration)||Math.round(elapsed);
+        $('liveStats').textContent='总距离 '+(meters/1000).toFixed(2)+' km'
+          +(seconds>0?' · 总时长 '+fmtDuration(seconds)+' · 平均配速 '+fmtPace(Number(stats.pace)||(meters>0?seconds/meters*1000:0)):'')
+          +(Number(stats.totalStep)>0?' · 总步数 '+stats.totalStep:'');
+        $('status').textContent='本次跑步已结束，绿色为实际记录轨迹';
+      }
+      publishUi();
+    }
+    function hideViewerUi(){
+      ['editorHeading','modesRow','editRow','routeOptions','startTools','toolsHeading','advancedTools'].forEach(id=>$(id).style.display='none');
+      $('viaCheckIns').hidden=true;$('save').closest('.row').style.display='none';
+      $('editing').checked=false;$('summary').hidden=true;$('liveStats').hidden=false;
+    }
+    function initViewer(){
+      const planned=(config.plannedPath||[]).filter(p=>Array.isArray(p)&&p.length>=2);
+      if(viewer==='live'&&planned.length>=2)
+        livePlanned=new AMap.Polyline({path:planned,strokeColor:'#9aa7b2',strokeWeight:3,strokeStyle:'dashed',bubble:true,map});
+      if(viewer==='finished'&&liveTrack.length){
+        const first=liveTrack[0],last=liveTrack[liveTrack.length-1];
+        liveEndMarkers=[new AMap.Marker({position:[first[0],first[1]],anchor:'center',bubble:false,zIndex:110,content:'<div class="number start">起</div>',map}),
+          new AMap.Marker({position:[last[0],last[1]],anchor:'center',bubble:false,zIndex:110,content:'<div class="number end">终</div>',map})];
+      }
+      setInterval(renderLive,500);renderLive();
+    }
+    function distance(a,b){const r=Math.PI/180,dlat=(b[1]-a[1])*r,dlng=(b[0]-a[0])*r;
+      const h=Math.sin(dlat/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin(dlng/2)**2;return 12756274*Math.asin(Math.sqrt(Math.min(1,h)));}
+    function length(points){return points.slice(1).reduce((sum,p,i)=>sum+distance(points[i],p),0);}
+    function nearest(p,points){let best=null;const scale=Math.cos(p[1]*Math.PI/180);
+      for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i],dx=(b[0]-a[0])*scale,dy=b[1]-a[1],den=dx*dx+dy*dy;
+        const t=den?Math.max(0,Math.min(1,((p[0]-a[0])*scale*dx+(p[1]-a[1])*dy)/den)):0;
+        const q=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t],meters=distance(p,q);
+        if(!best||meters<best.meters)best={point:q,index:i-1,meters};
+      }return best;}
+    function simplifyLine(points,tolerance){
+      if(points.length<3)return points.map(p=>p.slice());
+      const keep=new Set([0,points.length-1]);
+      // Preserve the original segment near a checkpoint; never move it onto a checkpoint.
+      if(activeRun)for(const point of targets){const join=nearest([Number(point.lng),Number(point.lat)],points);
+        if(join&&join.meters<=checkInRadius){keep.add(join.index);keep.add(join.index+1);}}
+      const pins=[...keep].sort((a,b)=>a-b),stack=[];
+      for(let i=1;i<pins.length;i++)stack.push([pins[i-1],pins[i]]);
+      while(stack.length){const [from,to]=stack.pop();if(to-from<2)continue;let index=-1,error=tolerance;
+        for(let i=from+1;i<to;i++){const meters=nearest(points[i],[points[from],points[to]]).meters;if(meters>error){error=meters;index=i;}}
+        if(index>=0){keep.add(index);stack.push([from,index],[index,to]);}
+      }
+      return [...keep].sort((a,b)=>a-b).map(i=>points[i].slice());
+    }
+    function compactDrawing(points,budget=MAX_DRAWING_POINTS){
+      let result=simplifyLine(points,1);
+      for(const tolerance of [1.5,2])if(result.length>budget)result=simplifyLine(points,tolerance);
+      return result;
+    }
+    // The two bend tips define the long axis; the third point defines a straight-side width.
+    // This is an editable track sketch. It does not infer actual lane geometry from a road API.
+    function trackLoop(points){
+      if(points.length!==3)throw Error('依次点操场两个弯道最外端，再点一侧直道；也可拖动三个控制点对齐跑道');
+      const [a,b,side]=points,origin=[(a[0]+b[0])/2,(a[1]+b[1])/2],scale=111319.49*Math.cos(origin[1]*Math.PI/180);
+      const xy=p=>[(p[0]-origin[0])*scale,(p[1]-origin[1])*111319.49],av=xy(a),bv=xy(b),sv=xy(side);
+      const dx=av[0]-bv[0],dy=av[1]-bv[1],span=Math.hypot(dx,dy);
+      if(span<20)throw Error('两个弯道端点太近，请沿操场长轴设置');
+      const u=[dx/span,dy/span],v=[u[1],-u[0]],radius=Math.abs(sv[0]*v[0]+sv[1]*v[1]),half=span/2-radius;
+      if(radius<4||half<0)throw Error('操场宽度无效，请将第三个点放在侧面直道上');
+      if(Math.abs(sv[0]*u[0]+sv[1]*u[1])>half+2)throw Error('第三个点应在侧面直道上，请拖动到两个弯道之间');
+      const result=[],arc=Math.max(16,Math.ceil(Math.PI*radius/2)),straight=Math.max(1,Math.ceil(half));
+      function push(along,across){result.push([origin[0]+(u[0]*along+v[0]*across)/scale,origin[1]+(u[1]*along+v[1]*across)/111319.49]);}
+      for(let i=0;i<=arc;i++){const t=Math.PI*i/arc;push(half+radius*Math.sin(t),radius*Math.cos(t));}
+      for(let i=1;i<=straight;i++)push(half-2*half*i/straight,-radius);
+      for(let i=1;i<=arc;i++){const t=Math.PI+Math.PI*i/arc;push(-half+radius*Math.sin(t),radius*Math.cos(t));}
+      for(let i=1;i<=straight;i++)push(-half+2*half*i/straight,radius);
+      result[result.length-1]=result[0].slice();return trackReverse?result.reverse():result;
+    }
+    function loopStartIndex(points){return points.length<3?-1:points.slice(0,-1).findIndex(p=>distance(p,points[points.length-1])<.01);}
+    function trackCycle(points){const index=loopStartIndex(points);if(index<0)throw Error('操场线路必须包含闭合跑道');return points.slice(index);}
+    function randomLoopPoint(loop){
+      let total=0;for(let i=1;i<loop.length;i++)total+=distance(loop[i-1],loop[i]);
+      if(total<.01)return loop[0].slice();
+      let remaining=Math.random()*total;
+      for(let i=1;i<loop.length;i++){
+        const a=loop[i-1],b=loop[i],segment=distance(a,b);
+        if(segment<.01)continue;
+        if(remaining<=segment){const ratio=remaining/segment;return [a[0]+(b[0]-a[0])*ratio,a[1]+(b[1]-a[1])*ratio];}
+        remaining-=segment;
+      }
+      return loop[loop.length-1].slice();
+    }
+    function closePath(points){if(mode!=='track'&&closed&&points.length>=2){const gap=distance(points[0],points[points.length-1]);
+      if(gap>.01&&(mode!=='draw'||gap<=DRAW_CLOSE_METERS))points.push(points[0].slice());}return points;}
+    function alignTrackStart(source){
+      const loop=trackCycle(source);
+      if(!activeRun&&(!selectedStart||trackDefaultStart)){selectedStart=randomLoopPoint(loop);trackDefaultStart=false;}
+      const start=activeRun?sessionStart:selectedStart,join=start&&nearest(start,loop);
+      if(!join)throw Error('操场线路没有有效接入点');
+      access=join.meters>.5?[[start.slice(),join.point.slice()]]:[];
+      return [start.slice(),join.point,...loop.slice(join.index+1),...loop.slice(1,join.index+1),join.point]
+        .filter((p,i,all)=>!i||distance(p,all[i-1])>.01);
+    }
+    function pinStart(points){if(!activeRun||!sessionStart)return points;
+      if(!points.length||distance(points[0],sessionStart)>2)points.unshift(sessionStart.slice());
+      else points[0]=sessionStart.slice();return points;}
+    function missingCheckIns(points){
+      let remaining=Number(config.runDistance),traversal=points,nextPoint=0;
+      const covered=targets.map(()=>false),cycle=loopStartIndex(points),ordered=[2,3].includes(Number(checkInPolicy.clockMode));
+      function entry(a,b,p){if(distance(a,p)<=checkInRadius)return a;
+        const scale=111319.49*Math.cos(p[1]*Math.PI/180),x=(a[0]-p[0])*scale,y=(a[1]-p[1])*111319.49;
+        const dx=(b[0]-a[0])*scale,dy=(b[1]-a[1])*111319.49,den=dx*dx+dy*dy,dot=x*dx+y*dy,disc=dot*dot-den*(x*x+y*y-checkInRadius*checkInRadius);
+        if(!den||disc<0)return null;const t=(-dot-Math.sqrt(disc))/den;
+        return t>=0&&t<=1?[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]:null;}
+      for(let pass=0;pass<targets.length+2;pass++){
+        const before=covered.filter(Boolean).length;
+        for(let i=1;i<traversal.length&&remaining>0&&!covered.every(Boolean);i++){
+          const a=traversal[i-1],end=traversal[i],meters=distance(a,end);if(meters<.01)continue;
+          const t=Math.min(1,remaining/meters),b=[a[0]+(end[0]-a[0])*t,a[1]+(end[1]-a[1])*t];remaining-=meters*t;
+          if(ordered){let from=a;while(nextPoint<targets.length){const p=targets[nextPoint],join=entry(from,b,[Number(p.lng),Number(p.lat)]);
+            if(!join)break;covered[nextPoint++]=true;from=join;}}
+          else targets.forEach((p,i)=>{if(!covered[i])covered[i]=nearest([Number(p.lng),Number(p.lat)],[a,b]).meters<=checkInRadius;});
+        }
+        if(remaining<=0||covered.every(Boolean)||!ordered||covered.filter(Boolean).length===before)break;
+        traversal=cycle>=0?points.slice(cycle):traversal.slice().reverse();
+      }
+      const name=i=>String(targets[i].pointName||targets[i].simpleName||('打卡点 '+(i+1)));
+      if(Number(checkInPolicy.clockMode)===10)return [];
+      if(Number(checkInPolicy.clockMode)!==1)return targets.map((_,i)=>i).filter(i=>!covered[i]).map(name);
+      const result=[];
+      for(const [type,goal,label] of [[2,Number(checkInPolicy.requiredPointCounts)||0,'必经'],[1,Number(checkInPolicy.optionalPointGoalCounts)||0,'可选']]){
+        const needed=Math.max(0,goal-targets.filter((p,i)=>covered[i]&&Number(p.type)===type).length);
+        if(needed)result.push('还需 '+needed+' 个'+label+'点（'+targets.map((_,i)=>i).filter(i=>!covered[i]&&Number(targets[i].type)===type).map(name).join('、')+'）');
+      }return result;
+    }
+    function contains(p){if(boundary.length<3)return true;let inside=false;
+      for(let i=0,j=boundary.length-1;i<boundary.length;j=i++){
+        const a=boundary[j],b=boundary[i],dx=b[0]-a[0],dy=b[1]-a[1],den=dx*dx+dy*dy;
+        const t=den?Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/den)):0;
+        if(Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)<1e-8)return true;
+        if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])inside=!inside;
+      }return inside;}
+    function inFence(points){for(let i=1;i<points.length;i++){
+      const a=points[i-1],b=points[i],n=Math.max(1,Math.ceil(distance(a,b)/2));
+      for(let j=0;j<=n;j++)if(!contains([a[0]+(b[0]-a[0])*j/n,a[1]+(b[1]-a[1])*j/n]))return false;
+    }return true;}
+    function status(message,error){$('status').textContent=message;$('status').className=error?'error':'';lastError=error?message:null;publishUi();}
+    function controls(){ $('modesRow').style.display='none'; ['track','manual','road','draw'].forEach(id=>$(id).classList.toggle('selected',mode===id));
+      const minimum=activeRun&&mode!=='track'?1:0;
+      $('undo').disabled=mode==='draw'?!history.length:anchors.length<=minimum;$('clear').disabled=mode==='draw'?drawn.length<=minimum:anchors.length<=minimum;
+      $('save').disabled=!ready||pending||!valid;
+      setToolText('save',activeRun?'确认本次线路':'使用线路');
+      const cycle=mode==='track'?loopStartIndex(path):-1;
+      $('summary').textContent=(mode==='track'?'操场每圈约 '+Math.round(length(cycle>=0?path.slice(cycle):path))+' 米'+(access.length?' · 起点接入 '+length(access[0]).toFixed(1)+' 米':''):(mode==='draw'?(stroke?'正在绘制，松手后精简':drawn.length+' 个线路点'):anchors.length+' 个控制点')+' · '+Math.round(length(path))+' 米')+(pending&&!stroke?' · 规划中':'')+(closed?' · 闭合':'');
+      $('summary').style.display=mode==='draw'?'block':'none';
+      $('editingLabel').textContent=mode==='draw'?'手指绘制':'点图加点';
+      $('drawSurface').hidden=!ready||mode!=='draw'||!$('editing').checked||fixed||startPicking;
+      mapGestures();
+      $('note').textContent=startPicking?'单指点击选择起跑位置，双指拖动或缩放地图。':fixed?'固定线路保持原形；取消固定复用即可修改。每次起跑检查本次打卡点。':mode==='track'?'拖动三个控制点对齐跑道，双指拖动或缩放地图；紫色接入段只走一次。':mode==='draw'?'单指画线，双指拖动或缩放地图；松手自动精简，最多 256 个点，绕圈请画回起点附近再勾选闭合。':inserting?'单指点击在最近路段插点，双指拖动或缩放地图。':'单指点击加点，拖动编号调整线路；双指拖动或缩放地图。';
+      ['track','manual','road','draw','undo','clear','closed','fromPreview','viaCheckIns','insert'].forEach(id=>{if(fixed)$(id).disabled=true;else if(!['undo','clear'].includes(id))$(id).disabled=!ready;});
+      $('closed').disabled=fixed||mode==='track';$('fromPreview').disabled=fixed||mode==='track'||!ready;
+      $('insert').disabled=fixed||mode==='draw'||mode==='track'||anchors.length<2;$('insert').classList.toggle('selected',inserting);
+      $('simplify').hidden=mode!=='draw';$('simplify').disabled=fixed||pending||drawn.length<3;
+      $('reverseTrack').hidden=mode!=='track';$('reverseTrack').disabled=fixed||!ready;$('reverseTrack').classList.toggle('selected',trackReverse);
+      $('fixed').disabled=!ready||pending||(!fixed&&!valid);
+      $('saveFixed').disabled=!ready||pending||!valid||!config.fenceCode;
+      $('editing').disabled=fixed;
+      $('pickStart').hidden=activeRun||mode!=='track';$('pickStart').disabled=fixed||!ready;
+      $('pickStart').classList.toggle('selected',startPicking);setToolText('pickStart',startPicking?'取消选起点':'设置起跑点');
+      $('resetStart').hidden=activeRun||mode!=='track'||!selectedStart;$('resetStart').disabled=fixed||!ready;
+      $('jitterValue').textContent=jitterMeters+' 米';
+      document.body.classList.toggle('picking-start',startPicking);
+      $('cancelStart').hidden=!startPicking;
+      publishUi();
+    }
+    function renderLine(){if(!map)return;
+      const options={path,strokeColor:'#3482ff',strokeWeight:6,isOutline:true,borderWeight:2,outlineColor:'#ffffff',zIndex:100,lineJoin:'round',showDir:true,bubble:true,strokeStyle:pending&&mode==='road'&&!fixed?'dashed':'solid'};
+      if(path.length>=2){if(line){line.setPath(path);line.setOptions(options);}else line=new AMap.Polyline({...options,map});}
+      else if(line){line.setMap(null);line=null;}
+      accessLines.forEach(o=>o.setMap(null));accessLines=access.map(points=>new AMap.Polyline({path:points,strokeColor:'#9656c8',strokeWeight:5,strokeStyle:'dashed',bubble:true,zIndex:60,map}));
+      if(previewLine)previewLine.setMap(anchors.length?null:map);controls();
+    }
+    function render(refreshMarkers=true){if(!map)return;
+      if(refreshMarkers){
+      markers.forEach(m=>m.setMap(null));markers=[];
+      anchors.forEach((p,i)=>{const locked=activeRun&&mode!=='track'&&i===0;
+        const drawStart=mode==='draw'&&i===0,drawEnd=mode==='draw'&&i===anchors.length-1;
+        const isStart=locked||drawStart,isEnd=drawEnd;
+        const linked=activeRun&&!locked&&targets.some(t=>distance(p,[Number(t.lng),Number(t.lat)])<2);
+        const marker=new AMap.Marker({position:p,draggable:!locked&&!fixed&&mode!=='draw',bubble:false,anchor:'center',title:isStart?'起点':isEnd?'终点':'线路点 '+(i+1),
+          content:'<div data-lng="'+p[0]+'" data-lat="'+p[1]+'" class="number'+(isStart?' start':'')+(isEnd?' end':'')+(linked?' linked':'')+'">'+(isStart?'起':isEnd?'终':i+1)+'</div>'});
+        marker.on('dragend',e=>{if(locked||fixed||mode==='draw')return;
+          if(multiTouch||performance.now()-lastNavigation<700){render();return;}
+          const point=[e.lnglat.getLng(),e.lnglat.getLat()];
+          if(!contains(point)){render();status('拖动位置在校园围栏外，已恢复原点',true);return;}
+          anchors[i]=point;changed();});marker.setMap(map);markers.push(marker);});
+      }
+      if(startMarker)startMarker.setMap(null);const markedStart=activeRun&&mode==='track'?sessionStart:!activeRun?selectedStart:null;
+      startMarker=markedStart?new AMap.Marker({position:markedStart,anchor:'center',bubble:false,title:activeRun?'本次起跑位置（固定）':'已选择的起跑位置',content:'<div class="number start">起</div>',map}):null;
+      renderLine();}
+    function renderCheckIns(points,tap){
+      points.forEach((p,i)=>{
+        const position=[Number(p.lng),Number(p.lat)];
+        if(p.lng==null||p.lat==null||!position.every(Number.isFinite)||Math.abs(position[0])>180||Math.abs(position[1])>90)return;
+        const name=String(p.pointName||p.simpleName||((tap?'碰一碰点 ':'打卡点 ')+(i+1)));
+        const content=document.createElement('div');content.className='checkpoint'+(tap?' tap':'');content.dataset.lng=position[0];content.dataset.lat=position[1];
+        const badge=document.createElement('span');badge.className='badge';badge.textContent=tap?'碰':'打';
+        const label=document.createElement('span');label.className='label';label.textContent=name;
+        content.append(badge,label);
+        const marker=new AMap.Marker({position,content,anchor:'top-left',zIndex:150,draggable:false,title:name,map});
+        marker.on('click',()=>{if(performance.now()-lastPointerUp<700)return;
+          if(startPicking||(mode!=='draw'&&$('editing').checked))addPoint(position);
+          else status(name+(p.code!=null?' · 编号 '+p.code:'')+(tap?' · 碰一碰参考点':' · 服务端打卡点'));});
+        checkInMarkers.push(marker);
+      });
+    }
+    let walkingLoad=null;
+    function walkingService(){
+      if(walking)return Promise.resolve(walking);
+      if(walkingLoad)return walkingLoad;
+      const loading=new Promise((resolve,reject)=>{
+        const timeout=setTimeout(()=>reject(Error('步行规划服务加载超时，请检查网络后重试')),20000);
+        const loaded=()=>{try{walking=new AMap.Walking();clearTimeout(timeout);resolve(walking);}catch(error){clearTimeout(timeout);reject(error);}};
+        if(typeof AMap.Walking==='function')loaded();else AMap.plugin('AMap.Walking',loaded);
+      });
+      walkingLoad=loading;loading.catch(()=>{if(walkingLoad===loading)walkingLoad=null;});
+      return loading;
+    }
+    async function walk(a,b){const key=JSON.stringify([a,b]);if(roadCache.has(key))return roadCache.get(key);
+      const service=await walkingService();
+      return new Promise((resolve,reject)=>{
+      const timeout=setTimeout(()=>reject(Error('步行规划超时，请检查网络后重试')),20000);
+      service.search(a,b,(state,result)=>{clearTimeout(timeout);
+        if(state!=='complete'||!result.routes||!result.routes.length){reject(Error('道路吸附失败：'+(result.info||state||'未找到步行道路')));return;}
+        const points=[];result.routes[0].steps.forEach(s=>s.path.forEach(p=>points.push([p.getLng(),p.getLat()])));
+        if(points.length<2){reject(Error('未返回有效步行线路'));return;}
+        // A checkpoint may be on an unmapped track. Keep it exactly on the route,
+        // show the access segments explicitly, and validate the entire route below.
+        const connectors=[[a.slice(),points[0].slice()],[points[points.length-1].slice(),b.slice()]].filter(s=>distance(s[0],s[1])>.5);
+        const connected={path:[a.slice(),...points,b.slice()],access:connectors};
+        roadCache.set(key,connected);resolve(connected);
+      });});}
+    async function rebuild(token){
+      if(!ready||token!==revision)return;
+      const selected=(fixed?fixedPath:mode==='draw'?drawn:anchors).map(p=>p.slice());
+      if(mode==='track'&&!fixed&&anchors.length!==3){path=[];valid=false;pending=false;render();status('依次点操场两个弯道最外端，再点一侧直道（'+anchors.length+' / 3）');return;}
+      if(selected.length<2){path=[];valid=false;pending=false;render();status(activeRun?'本次起跑位置已固定，请经打卡点规划或手动加点':selected.length?'再添加一个点即可预览线路':'点地图规划线路，或使用自动线路');return;}
+      closePath(selected);
+      pending=true;valid=false;controls();status(mode==='road'?'正在沿步行道路规划…':'正在检查线路…');
+      try{
+        let result=selected;
+        const drawingGap=mode==='draw'&&closed&&drawn.length>1?distance(drawn[0],drawn[drawn.length-1]):0;
+        if(drawingGap>DRAW_CLOSE_METERS){path=drawn.map(p=>p.slice());
+          throw Error('手绘首尾相距 '+drawingGap.toFixed(1)+' 米；请继续画回起点附近或取消闭合，不会自动补直线');}
+        if(mode==='track'){result=fixed?selected:trackLoop(anchors);path=result;result=alignTrackStart(result);}
+        if(mode==='road'&&!fixed){
+          result=[];const connectors=[];
+          for(let i=1;i<selected.length;i++){
+            if(token!==revision)return;
+            status('正在规划步行路段 '+i+' / '+(selected.length-1)+'…');
+            const segment=await walk(selected[i-1],selected[i]);
+            if(token!==revision)return;
+            if(result.length&&distance(result[result.length-1],segment.path[0])>2)
+              throw Error('相邻步行路段没有连通，请调整控制点');
+            result.push(...segment.path);connectors.push(...segment.access);
+          }
+          if(closed&&distance(result[0],result[result.length-1])>2)throw Error('步行道路未闭合，请调整首尾点');
+          if(closed)result[result.length-1]=result[0].slice();
+          access=connectors;
+        }
+        if(token!==revision)return;
+        path=result;const meters=length(path);
+        const tooDense=mode==='draw'&&!fixed&&drawn.length>MAX_DRAWING_POINTS;
+        valid=meters>=5&&meters<=100000&&path.length<=10000&&!tooDense&&inFence(path);
+        const missing=activeRun?missingCheckIns(path):[];
+        const wrongStart=activeRun&&(!sessionStart||distance(path[0],sessionStart)>2);
+        if(valid&&(missing.length||wrongStart)){
+          valid=false;status(wrongStart?'线路必须从本次起跑位置开始':'目标里程内未覆盖：'+missing.join('、')+'，请调整路线；本次会话已保留',true);
+        }else{
+        status(valid?(fixed?'固定线路检查通过'+(activeRun?' · 已满足本次打卡要求':''):mode==='track'?'操场线路已预览'+(access.length?' · 起点接入仅走一次':'')+(activeRun?' · 已满足本次打卡要求':''):mode==='road'?'道路规划完成'+(access.length?' · 紫色虚线直连接入 '+Math.round(access.reduce((m,s)=>m+length(s),0))+' 米':''):mode==='draw'?'手绘线路已预览'+(drawingSimplification?' · '+drawingSimplification.input+' 次采样 → '+drawingSimplification.output+' 个点':''):'手动线路已预览'):
+          (tooDense?'线条过于细碎，请点精简或重新绘制（最多 256 个线路点）':meters<5?'线路过短，请将控制点拉开':meters>100000?'线路超过 100 公里':path.length>10000?'线路点过多，请减少控制点':'线路越出校园围栏，请调整点位或改用手动直连'),!valid);
+        }
+      }catch(e){if(token!==revision)return;valid=false;status(e.message||'道路规划失败',true);}
+      finally{if(token===revision){pending=false;render(false);}}
+    }
+    function changed(){revision++;clearTimeout(timer);valid=false;pending=ready&&anchors.length>=2;access=[];
+      path=closePath((fixed?fixedPath:mode==='draw'?drawn:mode==='track'?[]:anchors).map(p=>p.slice()));
+      render();const token=revision;timer=setTimeout(()=>rebuild(token),mode==='road'?180:0);}
+    function addPoint(p){if(!ready)return;
+      if(!p.every(Number.isFinite)||!contains(p)){status('请在校园围栏内添加点',true);return;}
+      if(startPicking&&!activeRun){
+        selectedStart=p.slice();trackDefaultStart=false;startPicking=false;changed();status('起跑位置已选择，请保存线路；本次尚未发起起跑');return;}
+      if(mode==='draw'||fixed)return;if(anchors.length>=32){status('最多添加 32 个控制点',true);return;}
+      if(mode==='track'&&anchors.length>=3){status('操场三个控制点已设置，拖动编号即可调整；需要细调可切换手动加点或手绘',true);return;}
+      if(anchors.length&&distance(anchors[anchors.length-1],p)<.5){status('该点已在线路末尾，请点击其他位置');return;}
+      if(inserting&&anchors.length>=2){let best=Infinity,index=1;
+        for(let i=1;i<anchors.length+(closed?1:0);i++){
+          const a=anchors[i-1],b=anchors[i%anchors.length],scale=Math.cos(p[1]*Math.PI/180),dx=(b[0]-a[0])*scale,dy=b[1]-a[1],den=dx*dx+dy*dy;
+          const t=den?Math.max(0,Math.min(1,((p[0]-a[0])*scale*dx+(p[1]-a[1])*dy)/den)):0;
+          const d=distance(p,[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]);if(d<best){best=d;index=i;}
+        }anchors.splice(index,0,p.slice());
+      }else anchors.push(p.slice());
+      changed();status('已添加第 '+anchors.length+' 个点'+(mode==='road'?'，正在规划道路…':''));}
+    function drawingAnchors(){anchors=drawn.length<2?drawn.map(p=>p.slice()):[drawn[0].slice(),drawn[drawn.length-1].slice()];}
+    function loadDrawing(points){drawn=pinStart(points.map(p=>p.slice()));
+      drawingSimplification=null;
+      if(closed&&drawn.length>2&&distance(drawn[0],drawn[drawn.length-1])<.01)drawn.pop();
+      history=drawn.length>(activeRun?1:0)?[activeRun?1:0]:[];drawingAnchors();}
+    function pixelPoint(x,y){const box=$('map').getBoundingClientRect(),p=map.containerToLngLat(new AMap.Pixel(x-box.left,y-box.top));return [p.getLng(),p.getLat()];}
+    function appendStroke(e,force=false){if(!stroke)return;stroke.samples++;const moved=Math.hypot(e.clientX-stroke.x,e.clientY-stroke.y);
+      if(!force&&moved<3)return;
+      const p=pixelPoint(e.clientX,e.clientY);if(drawn.length&&distance(drawn[drawn.length-1],p)<(force?0.2:2))return;
+      if(drawn.length>=10000){status('手绘点已达 10000 个，请撤销后缩短轨迹',true);return;}
+      drawn.push(p);stroke.x=e.clientX;stroke.y=e.clientY;drawingAnchors();
+      path=closePath(drawn.map(p=>p.slice()));renderLine();}
+    function cancelStroke(){if(!stroke)return;drawn.length=stroke.before;stroke=null;drawingAnchors();changed();}
+    const surface=$('drawSurface');
+    function drawingEnabled(){return ready&&mode==='draw'&&$('editing').checked&&!fixed&&!startPicking;}
+    function mapGestures(){const drawing=drawingEnabled();$('map').classList.toggle('drawing',drawing);
+      // zoomEnable also gates setZoomAndCenter in AMap 2.0. Keep the camera API
+      // enabled and disable only native gesture inputs while owning two fingers.
+      if(map&&map.setStatus)map.setStatus({dragEnable:!drawing&&!multiTouch,zoomEnable:true,
+        touchZoom:!multiTouch,scrollWheel:!multiTouch,keyboardEnable:!multiTouch,
+        rotateEnable:false,pitchEnable:false,doubleClickZoom:!drawing&&!multiTouch});}
+    function mapPointer(e){return e.target instanceof Element&&($('map').contains(e.target)||e.target===surface)&&
+      !e.target.closest('.amap-control,.amap-controls,.amap-logo,.amap-copyright');}
+    function resetNavigation(){clearTimeout(navigationEndTimer);navigationEndTimer=0;
+      cancelAnimationFrame(navigationFrame);navigationFrame=0;navigation=null;multiTouch=false;mapGestures();}
+    function beginNavigation(){
+      cancelAnimationFrame(navigationFrame);navigationFrame=0;
+      const pair=Array.from(pointers.values()).filter(p=>p.type==='touch').slice(0,2);
+      if(pair.length<2||!ready)return;
+      const [a,b]=pair,box=$('map').getBoundingClientRect();
+      const midpoint=new AMap.Pixel((a.x+b.x)/2-box.left,(a.y+b.y)/2-box.top);
+      const anchor=map.containerToLngLat(midpoint);
+      navigation={ids:[a.id,b.id],anchor:[anchor.getLng(),anchor.getLat()],zoom:map.getZoom(6),
+        span:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),limits:map.getZooms()};
+    }
+    function moveNavigation(){navigationFrame=0;if(!navigation)return;
+      const [a,b]=navigation.ids.map(id=>pointers.get(id));if(!a||!b)return;
+      const box=$('map').getBoundingClientRect(),x=(a.x+b.x)/2-box.left,y=(a.y+b.y)/2-box.top;
+      const zoom=Math.max(navigation.limits[0],Math.min(navigation.limits[1],
+        navigation.zoom+Math.log2(Math.max(1,Math.hypot(a.x-b.x,a.y-b.y))/navigation.span)));
+      // Keep the starting geographic midpoint under the moving fingers, using
+      // AMap's projection at the new zoom. Parallel fingers therefore pan even
+      // when the SDK's built-in two-finger recognizer only supports zoom.
+      const anchor=map.lngLatToPixel(navigation.anchor,zoom);
+      const center=map.pixelToLngLat(new AMap.Pixel(anchor.getX()+box.width/2-x,anchor.getY()+box.height/2-y),zoom);
+      map.setZoomAndCenter(zoom,center,true);
+    }
+    function flushNavigation(){cancelAnimationFrame(navigationFrame);navigationFrame=0;moveNavigation();}
+    function finishNavigation(){if(pointers.size)return;
+      // Let the SDK receive terminal events with its gestures still disabled,
+      // so its first-finger state is cleared before normal interaction resumes.
+      navigationEndTimer=setTimeout(()=>{if(!pointers.size)resetNavigation();},0);
+    }
+    function consumeNavigation(e){if(e.cancelable)e.preventDefault();e.stopPropagation();}
+    // The editor owns two fingers; native one-finger map interaction is retained.
+    // Coalesce pointer moves so moving both fingers together does not briefly zoom.
+    document.addEventListener('pointerdown',e=>{
+      if(!mapPointer(e))return;
+      if(!pointers.size&&navigationEndTimer)resetNavigation();
+      pointers.set(e.pointerId,{id:e.pointerId,type:e.pointerType,x:e.clientX,y:e.clientY});
+      if(pointers.size>1){if(multiTouch)flushNavigation();multiTouch=true;lastNavigation=performance.now();tapGesture=null;cancelStroke();mapGestures();beginNavigation();consumeNavigation(e);return;}
+      if(multiTouch){consumeNavigation(e);return;}
+      if(multiTouch||!drawingEnabled()||e.button!==0||!e.isPrimary)return;
+      revision++;clearTimeout(timer);valid=false;pending=true;access=[];
+      stroke={id:e.pointerId,before:drawn.length,x:Infinity,y:Infinity,samples:0};appendStroke(e,true);status('正在绘制，松手后自动精简线条…');},true);
+    document.addEventListener('pointermove',e=>{
+      if(pointers.has(e.pointerId))pointers.set(e.pointerId,{id:e.pointerId,type:e.pointerType,x:e.clientX,y:e.clientY});
+      if(multiTouch){if(!navigationFrame)navigationFrame=requestAnimationFrame(moveNavigation);consumeNavigation(e);return;}
+      if(stroke&&stroke.id===e.pointerId)appendStroke(e);},true);
+    document.addEventListener('pointerup',e=>{if(!stroke||stroke.id!==e.pointerId||multiTouch)return;
+      appendStroke(e,true);const before=stroke.before;
+      if(drawn.length>before){const from=Math.max(0,before-1),part=compactDrawing(drawn.slice(from),MAX_DRAWING_POINTS-from);
+        drawn=drawn.slice(0,from).concat(part);history.push(before);
+        drawingSimplification={input:stroke.samples,output:Math.max(0,drawn.length-before)};}
+      stroke=null;drawingAnchors();changed();},true);
+    document.addEventListener('pointercancel',e=>{if(stroke&&stroke.id===e.pointerId)cancelStroke();},true);
+    for(const type of ['touchstart','touchmove'])document.addEventListener(type,e=>{
+      if(multiTouch)consumeNavigation(e);},{capture:true,passive:false});
+    for(const type of ['touchend','touchcancel'])document.addEventListener(type,e=>{
+      if(multiTouch&&e.cancelable)e.preventDefault();},{capture:true,passive:false});
+    window.addEventListener('blur',()=>{if(multiTouch||stroke){pointers.clear();cancelStroke();resetNavigation();}});
+    // Some Android WebViews deliver pointerup but suppress the compatibility click
+    // after a captured drawing stroke. Complete that control tap once, including
+    // checkboxes, and discard a delayed duplicate click from the same gesture.
+    function controlTarget(target,labels=false){
+      if(!(target instanceof Element)||!target.closest('.panel'))return null;
+      return target.closest('button')||(target.matches('input[type="checkbox"]')?target:
+        labels?target.closest('label')?.querySelector('input[type="checkbox"]'):null);
+    }
+    document.addEventListener('pointerdown',e=>{
+      const target=controlTarget(e.target,true);
+      controlTap=(e.pointerType==='touch'||e.pointerType==='pen')&&target&&!target.disabled?
+        {id:e.pointerId,target,x:e.clientX,y:e.clientY,done:false,released:false,firing:false}:null;
+    },true);
+    document.addEventListener('pointerup',e=>{
+      const tap=controlTap;if(!tap||tap.id!==e.pointerId)return;
+      if(Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>=9||controlTarget(e.target,true)!==tap.target){controlTap=null;return;}
+      tap.released=true;tap.time=performance.now();
+      setTimeout(()=>{if(controlTap!==tap||tap.done||tap.target.disabled)return;
+        tap.done=true;tap.firing=true;tap.target.click();tap.firing=false;
+      },60);
+    },true);
+    document.addEventListener('click',e=>{
+      const tap=controlTap;if(!tap||!tap.released||controlTarget(e.target)!==tap.target||performance.now()-tap.time>800)return;
+      if(tap.done&&!tap.firing){e.preventDefault();e.stopImmediatePropagation();}else tap.done=true;
+    },true);
+    document.addEventListener('pointercancel',()=>{controlTap=null;},true);
+    // Capture physical taps before SDK overlays can consume them. Map drag, marker
+    // drag and pinch gestures keep their normal behavior and never create points.
+    document.addEventListener('pointerdown',e=>{
+      if(multiTouch||pointers.size>1){tapGesture=null;return;}
+      if(!ready||(mode==='draw'&&!startPicking)||e.button!==0||!$('map').contains(e.target)||e.target.closest('.amap-control,.amap-controls,.amap-logo,.amap-copyright')||(!startPicking&&e.target.closest('.number')))return;
+      const checkpoint=e.target.closest('.checkpoint,.number[data-lng]');
+      tapGesture={id:e.pointerId,x:e.clientX,y:e.clientY,started:performance.now(),moved:0,point:checkpoint?[Number(checkpoint.dataset.lng),Number(checkpoint.dataset.lat)]:null};
+    },true);
+    document.addEventListener('pointermove',e=>{if(tapGesture&&tapGesture.id===e.pointerId)tapGesture.moved=Math.max(tapGesture.moved,Math.hypot(e.clientX-tapGesture.x,e.clientY-tapGesture.y));},true);
+    document.addEventListener('pointerup',e=>{
+      const wasMulti=multiTouch;if(wasMulti){flushNavigation();if(e.cancelable)e.preventDefault();}
+      pointers.delete(e.pointerId);const tap=tapGesture;tapGesture=null;lastPointerUp=performance.now();
+      if(wasMulti)lastNavigation=lastPointerUp;
+      if(tap&&!wasMulti&&tap.id===e.pointerId&&tap.moved<9&&performance.now()-tap.started<900&&(startPicking||(mode!=='draw'&&$('editing').checked)))
+        addPoint(tap.point||pixelPoint(e.clientX,e.clientY));
+      if(wasMulti){if(pointers.size>=2)beginNavigation();else navigation=null;finishNavigation();}
+      else if(!pointers.size)mapGestures();
+    },true);
+    document.addEventListener('pointercancel',e=>{pointers.delete(e.pointerId);tapGesture=null;lastPointerUp=performance.now();
+      if(multiTouch)lastNavigation=lastPointerUp;
+      if(multiTouch){if(pointers.size>=2)beginNavigation();else navigation=null;finishNavigation();}
+      else if(!pointers.size)mapGestures();},true);
+    function pointsFromPreview(){
+      const selected=[];
+      const count=Math.min(6,preview.length);
+      for(let i=0;i<count;i++){
+        const point=preview[Math.round(i*(preview.length-1)/(count-1))];
+        if(!selected.length||distance(selected[selected.length-1],point)>3)selected.push(point.slice());
+      }
+      if(selected.length<2){status('自动预览没有足够分散的线路点，请手动加点',true);return;}
+      anchors=pinStart(selected);closed=false;$('closed').checked=false;changed();
+    }
+    function planViaCheckIns(){
+      if(!ready||!sessionStart)return;
+      let selected=[sessionStart.slice()];
+      const source=targets.length?targets.map(p=>[Number(p.lng),Number(p.lat)]):
+        Array.from({length:Math.min(6,preview.length)},(_,i)=>preview[Math.round(i*(preview.length-1)/Math.max(1,Math.min(6,preview.length)-1))]);
+      for(const point of source){
+        if(!point.every(Number.isFinite)||!contains(point)){status('本次点位坐标无效或在围栏外，暂不上传',true);return;}
+        if(distance(selected[selected.length-1],point)>1)selected.push(point.slice());
+      }
+      if(selected.length>32){status('本次点位超过 32 个控制点，暂不自动规划',true);return;}
+      if(selected.length<2){status('本次点位都在起跑位置附近，请手动添加线路点',true);return;}
+      anchors=selected;mode='road';closed=false;$('closed').checked=false;changed();
+    }
+    function planTrack(){
+      if(!ready||fixed)return;if(mode==='track'){changed();return;}
+      mode='track';closed=true;inserting=false;trackReverse=false;$('closed').checked=true;$('editing').checked=true;anchors=[];
+      const points=targets.map(p=>[Number(p.lng),Number(p.lat)]).filter(p=>p.every(Number.isFinite)&&contains(p));
+      if(points.length>=3){
+        let tips=null,span=0;for(let i=0;i<points.length;i++)for(let j=i+1;j<points.length;j++){
+          const d=distance(points[i],points[j]);if(d>span){span=d;tips=[points[i],points[j]];}}
+        if(tips){const [a,b]=tips,origin=[(a[0]+b[0])/2,(a[1]+b[1])/2],scale=Math.cos(origin[1]*Math.PI/180),dx=(b[0]-a[0])*scale,dy=b[1]-a[1],axis=Math.hypot(dx,dy);
+          const offsets=points.map(p=>((p[0]-origin[0])*scale*dy-(p[1]-origin[1])*dx)/axis),low=Math.min(...offsets),high=Math.max(...offsets);
+          // Side markers can sit on opposite edges of the lane; balance both sides.
+          const radius=low<0&&high>0?(high-low)/2:Math.max(Math.abs(low),Math.abs(high));
+          const side=[origin[0]+radius*dy/axis/scale,origin[1]-radius*dx/axis];
+          anchors=[a.slice(),b.slice(),side];}
+      }
+      changed();
+    }
+    $('track').onclick=planTrack;
+    $('reverseTrack').onclick=()=>{trackReverse=!trackReverse;changed();};
+    $('viaCheckIns').onclick=planViaCheckIns;
+    $('fromPreview').onclick=pointsFromPreview;
+    function leaveDrawing(){if(mode!=='draw')return;
+      const count=Math.min(32,drawn.length);anchors=Array.from({length:count},(_,i)=>drawn[Math.round(i*(drawn.length-1)/Math.max(1,count-1))].slice());}
+    function leaveTrack(){if(mode!=='track')return;const source=path.length>2?path.slice(0,-1):anchors,count=Math.min(32,source.length);
+      anchors=Array.from({length:count},(_,i)=>source[Math.round(i*(source.length-1)/Math.max(1,count-1))].slice());anchors=pinStart(anchors);}
+    $('manual').onclick=()=>{leaveDrawing();leaveTrack();mode='manual';changed();};
+    $('road').onclick=()=>{leaveDrawing();leaveTrack();mode='road';if(activeRun&&anchors.length<2)planViaCheckIns();else if(!anchors.length&&preview.length>=2)pointsFromPreview();else changed();};
+    $('draw').onclick=()=>{if(mode!=='draw'){loadDrawing(path.length?path:anchors);closed=false;$('closed').checked=false;}mode='draw';$('editing').checked=true;changed();};
+    $('undo').onclick=()=>{if(mode==='draw'){if(history.length){const previous=history.pop();if(Array.isArray(previous))drawn=previous;else drawn.length=previous;}drawingSimplification=null;drawingAnchors();}else if(anchors.length>(activeRun&&mode!=='track'?1:0))anchors.pop();changed();};
+    $('clear').onclick=()=>{anchors=mode==='track'?[]:pinStart([]);drawn=anchors.map(p=>p.slice());history=[];changed();};
+    $('insert').onclick=()=>{inserting=!inserting;controls();status(inserting?'点击最近路段插入控制点':'点击地图向线路末尾加点');};
+    $('simplify').onclick=()=>{if(fixed||pending||drawn.length<3)return;const original=drawn.map(p=>p.slice());drawn=compactDrawing(drawn);history.push(original);
+      drawingSimplification={input:original.length,output:drawn.length};drawingAnchors();changed();};
+    $('fixed').onchange=()=>{fixed=$('fixed').checked;if(fixed)fixedPath=path.map(p=>p.slice());$('editing').checked=!fixed;changed();};
+    $('pickStart').onclick=()=>{startPicking=!startPicking;controls();status(startPicking?'点击校园围栏内的位置作为起跑点':'已取消设置起跑点');};
+    $('cancelStart').onclick=()=>{startPicking=false;controls();status('已取消设置起跑点');};
+    $('resetStart').onclick=()=>{selectedStart=null;trackDefaultStart=true;changed();status('将使用线路起点作为起跑位置');};
+    $('jitter').oninput=()=>{jitterMeters=Number($('jitter').value);controls();};
+    function result(){return {fenceCode:config.fenceCode||'',runRecordCode:config.runRecordCode||'',anchors,path:anchors.length?path:[],mode,closed,fixed,startPoint:selectedStart,jitterMeters,reverse:trackReverse};}
+    function fixedSaved(value){config.fixedDraft=value;$('loadFixed').hidden=false;status('固定线路已保存在本机');}
+    $('saveFixed').onclick=()=>{if(!ready||pending||!valid)return;fixed=true;fixedPath=path.map(p=>p.slice());$('fixed').checked=true;$('editing').checked=false;
+      render();const value=result();
+      if(window.RouteNative)window.RouteNative.saveFixedRoute(JSON.stringify(value));else fixedSaved(value);};
+    $('loadFixed').onclick=()=>{if(config.fixedDraft)window.RouteEditor.setDraft(config.fixedDraft);};
+    $('editing').onchange=controls;
+    $('detailsToggle').onclick=()=>{const show=$('details').hidden;$('details').hidden=!show;$('detailsToggle').setAttribute('aria-expanded',String(show));$('detailsToggle').textContent=show?'收起':'说明';};
+    $('closed').onchange=()=>{closed=$('closed').checked;changed();};
+    function fitMap(){if(!map)return;map.setFitView([line,line||liveLine?null:fence,previewLine,startMarker,liveLine,livePlanned,...liveEndMarkers,...markers,...checkInMarkers].filter(o=>o&&o.getMap()),true,
+      config.nativeControls?nativeInsets:[document.querySelector('.top').offsetHeight+28,document.querySelector('.bottom').offsetHeight+32,32,32]);}
+    $('location').hidden=viewer;
+    $('location').onclick=()=>{if(window.RouteNative&&typeof RouteNative.requestCurrentLocation==='function')RouteNative.requestCurrentLocation();else if(normalLocation)applyLocation(normalLocation,true);};
+    $('retry').onclick=()=>location.reload();
+    $('save').onclick=()=>{
+      if(pending||(activeRun?!valid:(!valid&&anchors.length))||!ready)return;
+      const value=result();
+      if(window.RouteNative)window.RouteNative.saveRoute(JSON.stringify(value));
+      else {window.savedRoute=value;status('线路已保存（浏览器预览）');}
+    };
+    window.RouteEditor={addPoint:addPoint,showError:message=>status(message,true),
+      fixedSaved,
+      getUiState:uiState,
+      performAction:id=>{if(!nativeActions.includes(id))return;const action=uiState().controls[id];if(action.enabled&&action.visible)$(id).click();},
+      setCurrentLocation:value=>{if(!validLocation(value)){status('当前位置无效，请检查定位权限后重试',true);return;}pendingLocation=value;if(window.AMap&&map)applyLocation(value,true);},
+      setJitter:value=>{if(viewer||!ready||!Number.isFinite(value))return;$('jitter').value=Math.max(0,Math.min(16,Math.round(value*2)/2));$('jitter').dispatchEvent(new Event('input'));},
+      setUiInsets:(top,bottom)=>{if(!Number.isFinite(top)||!Number.isFinite(bottom))return;nativeInsets=[Math.max(24,top+24),Math.max(24,bottom+24),24,24];document.body.style.setProperty('--native-bottom',Math.max(0,bottom)+'px');if(ready)fitMap();},
+      setLive:value=>{if(!viewer)return;liveBase={seconds:Number(value&&value.seconds)||liveBase.seconds,at:performance.now(),
+          running:value&&value.running===true,ending:value&&value.ending===true};renderLive();},
+      setLiveTrack:(points,startMs,targets)=>{if(!viewer||!Array.isArray(points))return;
+        liveTrack=points.filter(p=>Array.isArray(p)&&p.length>=2&&p.every(Number.isFinite));
+        liveStartMs=Number(startMs)||0;
+        liveTargets=(targets||[]).map(p=>({code:String(p.code??''),clockTime:Number(p.clockTime)||0}));
+        renderLive();},
+      getState:()=>({ready,pending,valid,anchors,path,mode,closed,fixed,startPoint:selectedStart,jitterMeters,reverse:trackReverse,drawingSimplification,access,error:lastError,meters:length(path)}),
+      setDraft:value=>{mode=lockedMode||(['road','draw','track'].includes(value.mode)?value.mode:'manual');anchors=(value.anchors||[]).map(p=>p.slice());if(mode!=='track')anchors=pinStart(anchors);closed=mode==='track'||value.closed===true;trackReverse=value.reverse===true;
+        if(mode==='draw')loadDrawing(value.path||[]);fixed=value.fixed===true;fixedPath=(value.path||[]).map(p=>p.slice());
+        selectedStart=activeRun?sessionStart:(value.startPoint||null);trackDefaultStart=!value.startPoint;jitterMeters=value.jitterMeters==null?0:Number(value.jitterMeters);
+        $('fixed').checked=fixed;$('editing').checked=!fixed;$('jitter').value=jitterMeters;$('closed').checked=closed;startPicking=false;changed();}};
+    if(viewer)hideViewerUi();
+    controls();
+    const nativeMapReady=()=>{if(window.RouteNative&&typeof RouteNative.mapReady==='function')RouteNative.mapReady();};
+    const nativeMapFailed=message=>{if(window.RouteNative&&typeof RouteNative.mapFailed==='function')RouteNative.mapFailed(String(message||'高德地图加载失败'));};
+    if(!config.key||!config.securityCode){const message='高德地图尚未配置，请在地图设置中填写 Web 端 Key 和安全密钥';status(message,true);nativeMapFailed(message);return;}
+    window._AMapSecurityConfig={securityJsCode:config.securityCode};
+    const loader=document.createElement('script');loader.src='https://webapi.amap.com/loader.js';
+    let loadTimer=setTimeout(()=>{const message='高德地图加载超时，请检查网络并重新加载';status(message,true);nativeMapFailed(message);$('retry').style.display='block';},30000);
+    loader.onerror=()=>{const message='高德地图加载失败，请检查网络';clearTimeout(loadTimer);status(message,true);nativeMapFailed(message);$('retry').style.display='block';};
+    loader.onload=()=>{AMapLoader.load({key:config.key,version:'2.0',plugins:['AMap.Scale']}).then(async()=>{
+      clearTimeout(loadTimer);
+      let initialCenter,initialLocation=null;
+      if(viewer){
+        const historical=(liveTrack.length?liveTrack[0]:preview[0]);
+        if(!historical||historical.length<2){status('没有可显示的历史轨迹或预览线路',true);$('retry').style.display='block';return;}
+        initialCenter=[Number(historical[0]),Number(historical[1])];
+      }else{
+        if(!validLocation(normalLocation)){status('未获取当前位置，请授予定位权限后重试',true);$('retry').style.display='block';return;}
+        try{initialLocation=await convertGps(normalLocation);initialCenter=initialLocation.point;}
+        catch(error){status(error.message||'当前位置坐标转换失败，请重试',true);$('retry').style.display='block';return;}
+      }
+      map=new AMap.Map('map',{zoom:viewer?16:18.5,center:initialCenter,zooms:[3,20],viewMode:'2D',rotateEnable:false,pitchEnable:false,
+        resizeEnable:true,mapStyle:'amap://styles/normal',features:['bg','road','point','building'],showLabel:true});
+      map.addControl(new AMap.Scale());configureBasemap();
+      if(initialLocation)updateLocationMarker(initialLocation,false);
+      if(boundary.length>=3)fence=new AMap.Polygon({path:boundary,strokeColor:'#18865b',strokeWeight:2,fillColor:'#3dc68b',fillOpacity:.08,bubble:true,map:map});
+      if(preview.length>=2)previewLine=new AMap.Polyline({path:preview,strokeColor:'#73b5d9',strokeWeight:3,strokeStyle:'dashed',bubble:true,map:map});
+      renderCheckIns(config.targetPoints||[],false);renderCheckIns(config.tapPoints||[],true);
+      map.on('click',e=>{if(!multiTouch&&(startPicking||(mode!=='draw'&&$('editing').checked))&&performance.now()-lastPointerUp>=700)addPoint([e.lnglat.getLng(),e.lnglat.getLat()]);});
+      ready=true;
+      if(viewer)initViewer();else changed();
+      if(viewer&&(fence||previewLine||checkInMarkers.length||livePlanned||liveTrack.length))fitMap();
+      if(activeRun&&config.autoPlan===true&&!fixed&&mode!=='track'&&anchors.length<2)planViaCheckIns();
+      $('retry').style.display='none';publishUi();nativeMapReady();
+      if(pendingLocation&&pendingLocation!==normalLocation)applyLocation(pendingLocation,true);
+    }).catch(e=>{const message='高德地图初始化失败：'+(e.message||String(e));clearTimeout(loadTimer);status(message,true);nativeMapFailed(message);$('retry').style.display='block';});};
+    document.head.appendChild(loader);
+  })();
+  </script>
+</body>
+</html>
